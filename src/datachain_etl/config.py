@@ -100,3 +100,53 @@ class ETLConfig:
         self.output_root.mkdir(parents=True, exist_ok=True)
         if self.archive_root:
             self.archive_root.mkdir(parents=True, exist_ok=True)
+
+
+@dataclass(slots=True)
+class STTConfig:
+    """Configuration for communicating with the STT API service."""
+
+    api_url: str
+    api_key: Optional[str] = None
+    api_key_header: str = "Authorization"
+    timeout: int = 30
+    max_retries: int = 3
+    retry_backoff: float = 2.0
+
+    @classmethod
+    def from_env(
+        cls,
+        prefix: str = "STT_",
+        *,
+        require: bool = False,
+    ) -> Optional["STTConfig"]:
+        """Instantiate the STT configuration from environment variables."""
+
+        api_url = os.getenv(f"{prefix}API_URL")
+        if not api_url:
+            if require:
+                raise RuntimeError("STT_API_URL environment variable must be provided")
+            return None
+
+        api_key = os.getenv(f"{prefix}API_KEY")
+        api_key_header = os.getenv(f"{prefix}API_KEY_HEADER", "Authorization")
+        timeout = int(os.getenv(f"{prefix}TIMEOUT", "30"))
+        max_retries = int(os.getenv(f"{prefix}MAX_RETRIES", "3"))
+        retry_backoff = float(os.getenv(f"{prefix}RETRY_BACKOFF", "2.0"))
+
+        return cls(
+            api_url=api_url,
+            api_key=api_key,
+            api_key_header=api_key_header,
+            timeout=timeout,
+            max_retries=max_retries,
+            retry_backoff=retry_backoff,
+        )
+
+    def build_headers(self) -> dict[str, str]:
+        """Construct request headers for STT API calls."""
+
+        headers: dict[str, str] = {}
+        if self.api_key:
+            headers[self.api_key_header] = self.api_key
+        return headers

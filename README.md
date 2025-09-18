@@ -15,6 +15,8 @@ berdasarkan data yang tersimpan di Postgres.
   - Menyediakan endpoint FastAPI (`POST /webhook`) yang bisa dipanggil melalui webhook ketika ada
     data baru.
   - Payload harus berisi `ticket_id` dan `file_path`; proses konversi akan dilakukan segera.
+  - Setelah file `.wav` terbentuk, tiket akan dimasukkan ke antrean untuk dikirim ke layanan
+    Speech-to-Text (STT) melalui HTTP API.
 
 ## Persiapan Lingkungan
 
@@ -33,6 +35,10 @@ berdasarkan data yang tersimpan di Postgres.
    - Opsional: `ETL_ARCHIVE_ROOT` untuk memindahkan file sumber setelah diproses,
      `ETL_BATCH_SIZE` untuk mengatur jumlah data sekali proses,
      `ETL_FFMPEG_BINARY` jika lokasi `ffmpeg` berbeda.
+   - Untuk integrasi STT near real-time:
+     - `STT_API_URL` : endpoint yang menerima permintaan transkripsi.
+     - Opsional: `STT_API_KEY` dan `STT_API_KEY_HEADER` bila endpoint memerlukan otorisasi,
+       `STT_TIMEOUT`, `STT_MAX_RETRIES`, `STT_RETRY_BACKOFF` untuk mengatur perilaku retry.
 
 ## Menjalankan Batch ETL
 
@@ -50,6 +56,11 @@ python scripts/run_webhook.py
 
 Secara bawaan server akan berjalan pada `0.0.0.0:8000`. Anda dapat menyesuaikannya dengan
 variabel `WEBHOOK_HOST` dan `WEBHOOK_PORT`.
+
+Ketika webhook menerima data baru, proses ETL akan langsung berjalan dan hasil `.wav` akan
+dimasukkan ke dalam antrean STT. Worker latar belakang akan mengirimkan file tersebut ke API
+`STT_API_URL` dengan retry sesuai konfigurasi sehingga proses transkripsi dapat berlangsung
+tanpa menahan request webhook.
 
 Contoh payload webhook:
 
@@ -69,6 +80,7 @@ Contoh payload webhook:
 - `datachain_etl.etl_core` : logika utama ETL.
 - `datachain_etl.scheduler` : penjadwalan batch job.
 - `datachain_etl.webhook` : aplikasi FastAPI untuk webhook near real-time.
+- `datachain_etl.stt_queue` : worker antrean untuk mengirim file hasil ETL ke layanan STT.
 - `datachain_etl.logging_config` : konfigurasi logging standar.
 
 ## Catatan
